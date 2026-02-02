@@ -18,6 +18,10 @@ export default function CustomizerPanel({className, style}: {className?: string,
 
   const state = model.state;
 
+  const handleRefresh = () => {
+    model.checkSyntax();
+  };
+
   const handleChange = (name: string, value: any) => {
     model.setVar(name, value);
   };
@@ -56,7 +60,10 @@ export default function CustomizerPanel({className, style}: {className?: string,
       <div style={{
         padding: '1rem 1.5rem',
         borderBottom: '1px solid #222222',
-        backgroundColor: '#0a0a0a'
+        backgroundColor: '#0a0a0a',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
         <h3 style={{
           margin: 0,
@@ -67,6 +74,21 @@ export default function CustomizerPanel({className, style}: {className?: string,
         }}>
           Parameters
         </h3>
+        <Button
+          icon="pi pi-refresh"
+          onClick={handleRefresh}
+          disabled={state.checkingSyntax}
+          loading={state.checkingSyntax}
+          rounded
+          text
+          tooltip="Refresh parameters"
+          tooltipOptions={{position: 'left'}}
+          style={{
+            width: '32px',
+            height: '32px',
+            color: '#ffffff'
+          }}
+        />
       </div>
 
       {/* Parameters List */}

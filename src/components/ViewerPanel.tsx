@@ -4,6 +4,7 @@ import { CSSProperties, useCallback, useContext, useEffect, useRef, useState } f
 import { ModelContext } from './contexts.ts';
 import { Toast } from 'primereact/toast';
 import { blurHashToImage, imageToBlurhash, imageToThumbhash, thumbHashToImage } from '../io/image_hashes.ts';
+import { Parameter } from '../state/customizer-types.ts';
 
 declare global {
   namespace JSX {
@@ -63,6 +64,9 @@ export default function ViewerPanel({className, style}: {className?: string, sty
   const [loadedUri, setLoadedUri] = useState<string | undefined>();
 
   const [cachedImageHash, setCachedImageHash] = useState<{hash: string, uri: string} | undefined>(undefined);
+  
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({x: 0, y: 0});
 
   const modelUri = state.output?.displayFileURL ?? state.output?.outFileURL ?? '';
   const loaded = loadedUri === modelUri;
@@ -169,6 +173,34 @@ export default function ViewerPanel({className, style}: {className?: string, sty
     };
   });
 
+  // Hover tooltip for showing parameters
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (e.target === modelViewerRef.current && state.parameterSet?.parameters?.length) {
+        setTooltipVisible(true);
+        setTooltipPosition({x: e.clientX, y: e.clientY});
+      } else if (tooltipVisible) {
+        setTooltipVisible(false);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      setTooltipVisible(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    if (modelViewerRef.current) {
+      modelViewerRef.current.addEventListener('mouseleave', handleMouseLeave);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (modelViewerRef.current) {
+        modelViewerRef.current.removeEventListener('mouseleave', handleMouseLeave);
+      }
+    };
+  }, [modelViewerRef.current, tooltipVisible, state.parameterSet]);
+
   return (
     <div className={className}
           style={{
@@ -252,6 +284,80 @@ export default function ViewerPanel({className, style}: {className?: string, sty
         >
           <span slot="progress-bar"></span>
         </model-viewer>
+      )}
+
+      {/* Hover Tooltip */}
+      {tooltipVisible && state.parameterSet?.parameters && state.parameterSet.parameters.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x + 15}px`,
+            top: `${tooltipPosition.y + 15}px`,
+            backgroundColor: 'rgba(10, 10, 10, 0.95)',
+            border: '1px solid #333',
+            borderRadius: '6px',
+            padding: '12px',
+            maxWidth: '350px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            zIndex: 1000,
+            pointerEvents: 'none',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+            fontSize: '0.85rem',
+            color: '#ffffff'
+          }}
+        >
+          <div style={{
+            fontWeight: 600,
+            marginBottom: '8px',
+            color: '#4CAF50',
+            fontSize: '0.9rem'
+          }}>
+            Available Parameters
+          </div>
+          {state.parameterSet.parameters.map((param: Parameter, idx: number) => (
+            <div
+              key={idx}
+              style={{
+                marginBottom: '8px',
+                paddingBottom: '8px',
+                borderBottom: idx < state.parameterSet!.parameters.length - 1 ? '1px solid #222' : 'none'
+              }}
+            >
+              <div style={{
+                fontWeight: 500,
+                color: '#ffffff',
+                marginBottom: '2px'
+              }}>
+                {param.name}
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                color: '#888',
+                marginBottom: '4px'
+              }}>
+                Type: {param.type}
+                {param.type === 'number' && 'min' in param && param.min !== undefined && ` • Range: ${param.min} - ${param.max}`}
+              </div>
+              {param.caption && (
+                <div style={{
+                  fontSize: '0.75rem',
+                  color: '#aaa',
+                  fontStyle: 'italic'
+                }}>
+                  {param.caption}
+                </div>
+              )}
+              <div style={{
+                fontSize: '0.75rem',
+                color: '#666',
+                marginTop: '2px'
+              }}>
+                Default: {JSON.stringify(param.initial)}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
