@@ -73,12 +73,14 @@ export default function ExportButton({className, style}: {className?: string, st
     <div className={className} style={style}>
       <SplitButton 
         label={selectedItem.buttonLabel}
-        disabled={!state.output || state.output.isPreview || state.rendering || state.exporting}
+        disabled={!state.output || state.rendering || state.exporting}
         icon="pi pi-download" 
         model={dropdownModel}
         severity="secondary"
         onClick={e => model!.export()}
         className="p-button-sm"
+        tooltip={!state.output ? "Render a model first to enable export" : undefined}
+        tooltipOptions={{ position: 'top' }}
       />
     </div>
   );

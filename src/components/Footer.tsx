@@ -51,10 +51,45 @@ export default function Footer({style}: {style?: CSSProperties}) {
         margin: '5px',
         ...(style ?? {})
     }}>
-      {state.output && !state.output.isPreview
-        ? (
-            <ExportButton />
-        ) : state.previewing ? (
+      {/* Import Button - Always visible */}
+      <Button
+        icon="pi pi-upload"
+        onClick={() => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.stl,.obj,.off,.3mf,.glb,.gltf';
+          input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = async (event) => {
+                const content = event.target?.result;
+                if (content) {
+                  try {
+                    const path = `/${file.name}`;
+                    model.fs.writeFileSync(path, new Uint8Array(content as ArrayBuffer));
+                    model.openFile(path);
+                    toast.current?.show({severity: 'success', summary: 'Imported', detail: `${file.name} imported successfully`});
+                  } catch (error) {
+                    toast.current?.show({severity: 'error', summary: 'Import Failed', detail: `${error}`});
+                  }
+                }
+              };
+              reader.readAsArrayBuffer(file);
+            }
+          };
+          input.click();
+        }}
+        className="p-button-sm p-button-secondary"
+        label="Import"
+        tooltip="Import 3D model (STL, OBJ, OFF, 3MF, GLB)"
+        tooltipOptions={{ position: 'top' }}
+      />
+
+      {/* Export Button - Always visible */}
+      <ExportButton />
+
+      {state.previewing ? (
           <Button
             icon="pi pi-bolt"
             disabled
