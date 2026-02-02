@@ -7,6 +7,7 @@ import { ModelContext } from './contexts';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  image?: string; // base64 encoded image
 }
 
 export default function AIChatPanel({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -16,7 +17,9 @@ export default function AIChatPanel({ visible, onClose }: { visible: boolean; on
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedKey = localStorage.getItem('gemini_api_key');
@@ -40,14 +43,32 @@ export default function AIChatPanel({ visible, onClose }: { visible: boolean; on
     setShowApiKeyInput(false);
   };
 
-  const generateOpenSCAD = async (prompt: string) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const generateOpenSCAD = async (prompt: string, imageData?: string) => {
     if (!apiKey) {
       setShowApiKeyInput(true);
       return;
     }
 
     setLoading(true);
-    const userMessage: Message = { role: 'user', content: prompt };
+    const userMessage: Message = { role: 'user', content: prompt, image: imageData };
     setMessages(prev => [...prev, userMessage]);
 
     try {
@@ -84,6 +105,7 @@ CRITICAL RULES:
 5. Add realistic details and proper proportions for new elements
 6. Ensure the modified code will render without errors
 7. If adding new features, integrate them seamlessly with existing code
+${imageData ? '8. If an image is provided, analyze it and incorporate its features into the 3D model' : ''}
 
 User's modification request: ${prompt}
 
@@ -99,10 +121,26 @@ CRITICAL RULES:
 6. Add realistic details like rounded edges, proper curves, and fine features
 7. Use variables for easy customization
 8. Ensure the code is production-ready and will render without errors
+${imageData ? '9. If an image is provided, analyze it carefully and create a 3D model that matches its shape, proportions, and features' : ''}
 
 User request: ${prompt}
 
 Generate the OpenSCAD code now (just the code, nothing else):`;
+
+      // Build request parts
+      const requestParts: any[] = [{ text: systemPrompt }];
+      
+      // Add image if provided
+      if (imageData) {
+        const base64Data = imageData.split(',')[1];
+        const mimeType = imageData.split(',')[0].split(':')[1].split(';')[0];
+        requestParts.push({
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Data
+          }
+        });
+      }
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
@@ -114,11 +152,7 @@ Generate the OpenSCAD code now (just the code, nothing else):`;
           body: JSON.stringify({
             contents: [
               {
-                parts: [
-                  {
-                    text: systemPrompt
-                  }
-                ]
+                parts: requestParts
               }
             ],
             generationConfig: {
@@ -168,8 +202,12 @@ Generate the OpenSCAD code now (just the code, nothing else):`;
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim() && !loading) {
-      generateOpenSCAD(input.trim());
+      generateOpenSCAD(input.trim(), selectedImage || undefined);
       setInput('');
+      setSelectedImage(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -306,6 +344,19 @@ Generate the OpenSCAD code now (just the code, nothing else):`;
               wordBreak: 'break-word',
               border: msg.role === 'user' ? 'none' : '1px solid #222222'
             }}>
+              {msg.image && (
+                <img 
+                  src={msg.image} 
+                  alt="Uploaded" 
+                  style={{ 
+                    maxWidth: '100%', 
+                    maxHeight: '200px', 
+                    borderRadius: '4px',
+                    marginBottom: '0.5rem',
+                    display: 'block'
+                  }} 
+                />
+              )}
               {msg.role === 'assistant' && msg.content.includes('Error:') ? (
                 <span style={{ color: '#ff6b6b' }}>{msg.content}</span>
               ) : msg.role === 'assistant' ? (
@@ -344,7 +395,63 @@ Generate the OpenSCAD code now (just the code, nothing else):`;
         borderTop: '1px solid #222222',
         backgroundColor: '#0a0a0a'
       }}>
+        {selectedImage && (
+          <div style={{
+            marginBottom: '0.5rem',
+            position: 'relative',
+            display: 'inline-block'
+          }}>
+            <img 
+              src={selectedImage} 
+              alt="Selected" 
+              style={{ 
+                maxWidth: '150px', 
+                maxHeight: '150px', 
+                borderRadius: '4px',
+                border: '1px solid #222222'
+              }} 
+            />
+            <Button
+              icon="pi pi-times"
+              rounded
+              text
+              severity="danger"
+              onClick={removeImage}
+              style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '-8px',
+                width: '24px',
+                height: '24px',
+                minWidth: '24px',
+                backgroundColor: '#ff6b6b',
+                color: '#ffffff'
+              }}
+            />
+          </div>
+        )}
         <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            style={{ display: 'none' }}
+          />
+          <Button
+            icon="pi pi-image"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            tooltip="Upload image"
+            tooltipOptions={{ position: 'top' }}
+            style={{ 
+              alignSelf: 'flex-end',
+              backgroundColor: '#1a1a1a',
+              border: '1px solid #333333',
+              color: '#ffffff'
+            }}
+          />
           <InputTextarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
