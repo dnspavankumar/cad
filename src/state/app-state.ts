@@ -47,6 +47,7 @@ export interface State {
     aiChatVisible?: boolean,
     codeEditorVisible?: boolean,
     sketcherVisible?: boolean,
+    cvControlVisible?: boolean,
     layout: {
       mode: 'single',
       focus: SingleLayoutComponentId,
